@@ -1,0 +1,6 @@
+yara-python
+python-magic-win64
+pefile
+PyExifTool
+pandas
+signify
