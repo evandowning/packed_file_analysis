@@ -9,6 +9,23 @@ from statistics import mean
 import time
 import gzip
 import shutil
+import subprocess
+from datetime import datetime
+
+# Activate Environment
+# C:\Users\analyst\Desktop\venv\pe_analysis\Scripts\activate
+
+# Not Packed:
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "none" -o "E:\data\packed_malware_gatech\not_packed" -t F:\pe_analysis\temp_not_packed
+
+# Run APK2
+# (pe_analysis) F:\pe_analysis>python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "andpakk2" -o "E:\data\packed_malware_gatech\packed_andpakk2" -t F:\pe_analysis\temp_andpakk2
+
+# Run MEW
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "mew" -o "E:\data\packed_malware_gatech\packed_mew" -t F:\pe_analysis\temp_mew
+
+# Run UPX
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "upx" -o "E:\data\packed_malware_gatech\packed_upx" -t F:\pe_analysis\temp_upx
 
 def compress_file(input_filepath, output_filepath):
     try:
@@ -44,12 +61,84 @@ def uncompress_file(input_filepath, output_filepath):
 
     return "success"
 
+def packer_andpakk2(filepath):
+    packed_filepath = filepath + '.packed'
+    try:
+        proc1 = subprocess.Popen(r"C:\packers\ANDpakk2\apk2.exe {} -o {}".format(filepath, packed_filepath))
+        time.sleep(30.0)
+        proc1.kill()
+        time.sleep(1.0)
+        if os.path.exists(packed_filepath):
+            return packed_filepath
+        return ''
+    except Exception as e:
+        return ''
+
+def packer_aspack(filepath):
+    packed_filepath = filepath + '.packed'
+    try:
+        proc1 = subprocess.Popen(r"C:\packers\aspack\ASPack.exe {} /O{}".format(filepath, packed_filepath))
+        #proc1 = subprocess.Popen([r"C:\packers\aspack\ASPack.exe", filepath, "/O", "{}".format(packed_filepath)])
+        time.sleep(3.0)
+        proc1.kill()
+        time.sleep(1.0)
+        if os.path.exists(packed_filepath):
+            return packed_filepath
+        return ''
+    except Exception as e:
+        return ''
+
+def packer_upx(filepath):
+    packed_filepath = filepath + '.packed'
+    try:
+        proc1 = subprocess.Popen(r"C:\packers\upx\upx.exe -q -o {} {}".format(packed_filepath, filepath))
+        time.sleep(5.0)
+        proc1.kill()
+        time.sleep(1.0)
+        if os.path.exists(packed_filepath):
+            return packed_filepath
+        return ''
+    except Exception as e:
+        return ''
+
+def packer_mew(filepath):
+    '''
+    Mew packs the file in place and it might fail, so we need to compare the hash before and after.
+    '''
+    try:
+        orig_hashes = utils.get_hashes(filepath=filepath)
+        print("\nORIGINAL HASH: {}".format(len(orig_hash)))
+        print(orig_hashes)
+        proc1 = subprocess.Popen(r"C:\packers\MEW\mew11.exe {}".format(filepath))
+        #proc1 = subprocess.Popen([r"C:\packers\MEW\mew11.exe", filepath])
+        time.sleep(15.0)
+        proc1.kill()
+        time.sleep(1.0)
+        new_hashes = utils.get_hashes(filepath=filepath)
+        orig_hash = orig_hashes.get('md5', '')
+        new_hash = new_hashes.get('md5', '')
+        print("NEW HASH: {}".format(len(new_hash)))
+        print(new_hashes)
+        # They are both valid MD5 values, but not equal
+        if len(orig_hash) == 32 and len(new_hash) == 32 and orig_hash != new_hash:
+            return filepath
+        return ''
+    except Exception as e:
+        return ''
+
+
+
 def pack_file(temp_filepath, packer):
     if packer == 'none':
         return temp_filepath
-
-
-
+    if packer == 'aspack':
+        return packer_aspack(temp_filepath)
+    if packer == 'andpakk2':
+        return packer_andpakk2(temp_filepath)
+    if packer == 'mew':
+        return packer_mew(temp_filepath)
+    if packer == 'upx':
+        return packer_upx(temp_filepath)
     return temp_filepath
 
 
@@ -86,12 +175,17 @@ def process_file(input_file):
 
         # Call packing routine
         packed_filepath = pack_file(temp_filepath, packer)
-        hashes = utils.get_hashes(filepath=packed_filepath)
-        packed_hashes = {'packed_{}'.format(key) : value for key, value in hashes.items()}
-        result.update(packed_hashes)
-        new_packed_filename = '{}.gz'.format(hashes.get('sha256', 'error'))
-        new_packed_filepath = os.path.join(output_dir, new_packed_filename)
-        compress_file(packed_filepath, new_packed_filepath)
+        if packed_filepath != '':
+            hashes = utils.get_hashes(filepath=packed_filepath)
+            packed_hashes = {'packed_{}'.format(key) : value for key, value in hashes.items()}
+            result.update(packed_hashes)
+            new_packed_filename = '{}.gz'.format(hashes.get('sha256', 'error'))
+            new_packed_filepath = os.path.join(output_dir, new_packed_filename)
+            compress_file(packed_filepath, new_packed_filepath)
+        else:
+            result['status'] = 'Failed to pack file: {}'.format(temp_filepath)
+            shutil.rmtree(input_file_temp_dir, ignore_errors=False, onerror=None)
+            return result
 
         # Destroy temporary space
         shutil.rmtree(input_file_temp_dir, ignore_errors=False, onerror=None)
@@ -108,7 +202,7 @@ def process_file(input_file):
 def process_files(input_dir, packers, output_dir='./output', temp_directory = './temp'):
     all_files = get_files(input_dir)
     batch_run_times = []
-    batch_size = 10
+    batch_size = 1000
     num_batches = math.ceil(len(all_files) / batch_size)
     start_idx = 0
     end_idx = min(batch_size, len(all_files))
@@ -127,7 +221,8 @@ def process_files(input_dir, packers, output_dir='./output', temp_directory = '.
             prepared_input = [{'filepath' : filepath, 'temp_dir' : temp_directory, 'output_dir' : os.path.join(output_dir, "{:05d}".format(i)), 'packer' : packer} for filepath in all_files_batch]
 
             # Kick off batch
-            pool = mp.Pool(mp.cpu_count())
+            # pool = mp.Pool(mp.cpu_count())
+            pool = mp.Pool(1)
             result = pool.map(process_file, prepared_input)
             temp_df = pd.DataFrame(result)
             result_df = pd.concat([result_df, temp_df])
@@ -143,7 +238,8 @@ def process_files(input_dir, packers, output_dir='./output', temp_directory = '.
             start_idx += batch_size
             end_idx += batch_size
 
-    result_df.to_csv('./all_files_processed.csv', index=False, header=True, encoding='utf-8')
+    print("DONE")
+    result_df.to_csv('./{}_{}_all_files_processed.csv'.format(datetime.now().isoformat(), packer), index=False, header=True, encoding='utf-8')
     return result_df
     
 def get_files(directory_path):
