@@ -233,7 +233,7 @@ def process_files(input_dir, packers, output_dir='./output', temp_directory = '.
     print("DONE")
     result_df.to_csv('./{}_{}_all_files_processed.csv'.format(datetime.now().isoformat(), packer), index=False, header=True, encoding='utf-8')
     return result_df
-    
+
 def get_files(directory_path):
     all_files = []
     for filename in Path(directory_path).glob('**/*'):

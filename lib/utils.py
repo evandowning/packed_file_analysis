@@ -8,6 +8,8 @@ from statistics import mean, stdev
 import math
 from collections import Counter
 import gzip
+from pathlib import Path
+import os
 
 def compress_file(input_filepath, output_filepath):
     try:
@@ -26,13 +28,23 @@ def compress_file(input_filepath, output_filepath):
 
     return "success"
 
-def decompress_file(input_filepath, output_filepath):
+def decompress_file(input_filepath, output_filepath='None', in_memory=False):
+    '''
+
+    :param input_filepath:
+    :param output_filepath:
+    :param in_memory: If True, output_filepath is ignored and a buffer containing the uncompressed data is returned
+    :return:
+    '''
     try:
         input = gzip.GzipFile(input_filepath, 'rb')
         file_content = input.read()
         input.close()
     except Exception as e:
         return "Could not read gzipped file: {}: {}".format(input_filepath, e)
+
+    if in_memory:
+        return file_content
 
     try:
         output = open(output_filepath, 'wb')
@@ -159,3 +171,11 @@ def get_strings(filepath=None, verbose=False):
         strings['msg'] = 'Error: {}'.format(e)
 
     return strings
+
+def get_files(directory_path):
+    all_files = []
+    for filename in Path(directory_path).glob('**/*'):
+        filename = str(filename)
+        if os.path.isfile(filename):
+            all_files.append(filename)
+    return all_files
