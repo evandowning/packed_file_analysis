@@ -36,8 +36,10 @@ class PEFile:
             file_details.update(self.get_resources())
             file_details.update(self.get_authenticode())
             self.file_details = file_details
+            self.pe.close()
             return file_details
         except Exception as e:
+            self.pe.close()
             return {'msg' : 'Error reading file: {} with exception: {}'.format(self.filepath, e)}
 
 

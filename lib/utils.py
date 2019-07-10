@@ -7,7 +7,41 @@ import subprocess
 from statistics import mean, stdev
 import math
 from collections import Counter
+import gzip
 
+def compress_file(input_filepath, output_filepath):
+    try:
+        input = open(input_filepath, 'rb')
+        file_content = input.read()
+        input.close()
+    except Exception as e:
+        return "Could not read file: {}: {}".format(input_filepath, e)
+
+    try:
+        output = gzip.GzipFile(output_filepath, 'wb')
+        output.write(file_content)
+        output.close()
+    except Exception as e:
+        return "Could not write gzipped file: {}: {}".format(output_filepath, e)
+
+    return "success"
+
+def decompress_file(input_filepath, output_filepath):
+    try:
+        input = gzip.GzipFile(input_filepath, 'rb')
+        file_content = input.read()
+        input.close()
+    except Exception as e:
+        return "Could not read gzipped file: {}: {}".format(input_filepath, e)
+
+    try:
+        output = open(output_filepath, 'wb')
+        output.write(file_content)
+        output.close()
+    except Exception as e:
+        return "Could not write file: {}: {}".format(output_filepath, e)
+
+    return "success"
 
 def get_entropy(text):
     freq_counts = Counter(text)
@@ -71,7 +105,7 @@ def basic_stats(numeric_list):
         return 0, 0, 0, 0
 
 
-def get_strings(filepath=None):
+def get_strings(filepath=None, verbose=False):
     strings = {'strings_unicode' : '',
                'strings_ascii' : '',
                'strings_unicode_cnt' : 0,
@@ -98,8 +132,9 @@ def get_strings(filepath=None):
         unicode_strings = unicode_bytes.decode('utf-8')
         ascii_strings = ascii_bytes.decode('utf-8')
 
-        strings['strings_ascii'] = ascii_strings
-        strings['strings_unicode'] = unicode_strings
+        if verbose:
+            strings['strings_ascii'] = ascii_strings
+            strings['strings_unicode'] = unicode_strings
 
         ascii_strings_lengths = [len(text) for text in ascii_strings.split('\n')]
         unicode_strings_lengths = [len(text) for text in unicode_strings.split('\n')]

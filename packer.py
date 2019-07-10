@@ -7,10 +7,10 @@ import os
 import math
 from statistics import mean
 import time
-import gzip
 import shutil
 import subprocess
 from datetime import datetime
+import random
 
 # Activate Environment
 # C:\Users\analyst\Desktop\venv\pe_analysis\Scripts\activate
@@ -26,40 +26,6 @@ from datetime import datetime
 
 # Run UPX
 # python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "upx" -o "E:\data\packed_malware_gatech\packed_upx" -t F:\pe_analysis\temp_upx
-
-def compress_file(input_filepath, output_filepath):
-    try:
-        input = open(input_filepath, 'rb')
-        file_content = input.read()
-        input.close()
-    except Exception as e:
-        return "Could not read file: {}: {}".format(input_filepath, e)
-
-    try:
-        output = gzip.GzipFile(output_filepath, 'wb')
-        output.write(file_content)
-        output.close()
-    except Exception as e:
-        return "Could not write gzipped file: {}: {}".format(output_filepath, e)
-
-    return "success"
-
-def uncompress_file(input_filepath, output_filepath):
-    try:
-        input = gzip.GzipFile(input_filepath, 'rb')
-        file_content = input.read()
-        input.close()
-    except Exception as e:
-        return "Could not read gzipped file: {}: {}".format(input_filepath, e)
-
-    try:
-        output = open(output_filepath, 'wb')
-        output.write(file_content)
-        output.close()
-    except Exception as e:
-        return "Could not write file: {}: {}".format(output_filepath, e)
-
-    return "success"
 
 def packer_andpakk2(filepath):
     packed_filepath = filepath + '.packed'
@@ -107,17 +73,17 @@ def packer_mew(filepath):
     '''
     try:
         orig_hashes = utils.get_hashes(filepath=filepath)
-        print("\nORIGINAL HASH: {}".format(len(orig_hash)))
+        orig_hash = orig_hashes.get('md5', '')
+        print("\nORIGINAL HASH: {}".format(orig_hash))
         print(orig_hashes)
         proc1 = subprocess.Popen(r"C:\packers\MEW\mew11.exe {}".format(filepath))
-        #proc1 = subprocess.Popen([r"C:\packers\MEW\mew11.exe", filepath])
         time.sleep(15.0)
         proc1.kill()
         time.sleep(1.0)
         new_hashes = utils.get_hashes(filepath=filepath)
-        orig_hash = orig_hashes.get('md5', '')
+
         new_hash = new_hashes.get('md5', '')
-        print("NEW HASH: {}".format(len(new_hash)))
+        print("NEW HASH: {}".format(new_hash))
         print(new_hashes)
         # They are both valid MD5 values, but not equal
         if len(orig_hash) == 32 and len(new_hash) == 32 and orig_hash != new_hash:
@@ -126,6 +92,32 @@ def packer_mew(filepath):
     except Exception as e:
         return ''
 
+def packer_mpress(filepath):
+    '''
+    Mpress packs the file in place and it might fail, so we need to compare the hash before and after.
+    '''
+    try:
+        random_options = ['-q', '-q -m', '-q -r', '-q -s', '-q -m']
+        selected_option = random_options[random.randint(0, len(random_options))]
+        orig_hashes = utils.get_hashes(filepath=filepath)
+        orig_hash = orig_hashes.get('md5', '')
+        print("\nORIGINAL HASH: {}".format(orig_hash))
+        print(orig_hashes)
+        proc1 = subprocess.Popen(r"C:\packers\mpress\mpress.exe {} {}".format(selected_option, filepath))
+        time.sleep(15.0)
+        # Clean up
+        proc1.kill()
+        time.sleep(1.0)
+        new_hashes = utils.get_hashes(filepath=filepath)
+        new_hash = new_hashes.get('md5', '')
+        print("NEW HASH: {}".format(new_hash))
+        print(new_hashes)
+        # They are both valid MD5 values, but not equal
+        if len(orig_hash) == 32 and len(new_hash) == 32 and orig_hash != new_hash:
+            return filepath
+        return ''
+    except Exception as e:
+        return ''
 
 
 def pack_file(temp_filepath, packer):
@@ -165,7 +157,7 @@ def process_file(input_file):
         # We either copy the file or unzip it
         if orig_filepath.endswith('.gz'):
             temp_filepath = temp_filepath[:-3]
-            uncompress_file(orig_filepath, temp_filepath)
+            utils.decompress_file(orig_filepath, temp_filepath)
         else:
             shutil.copy(orig_filepath, temp_filepath)
 
@@ -181,7 +173,7 @@ def process_file(input_file):
             result.update(packed_hashes)
             new_packed_filename = '{}.gz'.format(hashes.get('sha256', 'error'))
             new_packed_filepath = os.path.join(output_dir, new_packed_filename)
-            compress_file(packed_filepath, new_packed_filepath)
+            utils.compress_file(packed_filepath, new_packed_filepath)
         else:
             result['status'] = 'Failed to pack file: {}'.format(temp_filepath)
             shutil.rmtree(input_file_temp_dir, ignore_errors=False, onerror=None)
@@ -221,8 +213,8 @@ def process_files(input_dir, packers, output_dir='./output', temp_directory = '.
             prepared_input = [{'filepath' : filepath, 'temp_dir' : temp_directory, 'output_dir' : os.path.join(output_dir, "{:05d}".format(i)), 'packer' : packer} for filepath in all_files_batch]
 
             # Kick off batch
-            # pool = mp.Pool(mp.cpu_count())
-            pool = mp.Pool(1)
+            pool = mp.Pool(mp.cpu_count())
+            # pool = mp.Pool(1)
             result = pool.map(process_file, prepared_input)
             temp_df = pd.DataFrame(result)
             result_df = pd.concat([result_df, temp_df])
