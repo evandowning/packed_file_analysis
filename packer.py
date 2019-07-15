@@ -16,16 +16,20 @@ import random
 # C:\Users\analyst\Desktop\venv\pe_analysis\Scripts\activate
 
 # Not Packed:
-# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "none" -o "E:\data\packed_malware_gatech\not_packed" -t F:\pe_analysis\temp_not_packed
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "none" -o "E:\data\packed_malware_gatech\not_packed" -t "E:\data\packed_malware_gatech\temp\temp_not_packed"
 
 # Run APK2
-# (pe_analysis) F:\pe_analysis>python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "andpakk2" -o "E:\data\packed_malware_gatech\packed_andpakk2" -t F:\pe_analysis\temp_andpakk2
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "andpakk2" -o "E:\data\packed_malware_gatech\packed_andpakk2" -t "E:\data\packed_malware_gatech\temp\temp_andpakk2" -c 2
 
 # Run MEW
-# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "mew" -o "E:\data\packed_malware_gatech\packed_mew" -t F:\pe_analysis\temp_mew
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "mew" -o "E:\data\packed_malware_gatech\packed_mew" -t "E:\data\packed_malware_gatech\temp\temp_mew" -c 2
 
 # Run UPX
-# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "upx" -o "E:\data\packed_malware_gatech\packed_upx" -t F:\pe_analysis\temp_upx
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "upx" -o "E:\data\packed_malware_gatech\packed_upx" -t "E:\data\packed_malware_gatech\temp\temp_upx" -c 1
+
+# Run aspack
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "aspack" -o "E:\data\packed_malware_gatech\packed_aspack" -t "E:\data\packed_malware_gatech\temp\temp_aspack" -c 3
+
 
 def packer_andpakk2(filepath):
     packed_filepath = filepath + '.packed'
@@ -45,7 +49,7 @@ def packer_aspack(filepath):
     try:
         proc1 = subprocess.Popen(r"C:\packers\aspack\ASPack.exe {} /O{}".format(filepath, packed_filepath))
         #proc1 = subprocess.Popen([r"C:\packers\aspack\ASPack.exe", filepath, "/O", "{}".format(packed_filepath)])
-        time.sleep(3.0)
+        time.sleep(10.0)
         proc1.kill()
         time.sleep(1.0)
         if os.path.exists(packed_filepath):
@@ -56,9 +60,12 @@ def packer_aspack(filepath):
 
 def packer_upx(filepath):
     packed_filepath = filepath + '.packed'
+    brute_option = ''
+    if random.randint(0,1):
+        brute_option = '--brute'
     try:
-        proc1 = subprocess.Popen(r"C:\packers\upx\upx.exe -q -o {} {}".format(packed_filepath, filepath))
-        time.sleep(5.0)
+        proc1 = subprocess.Popen(r"C:\packers\upx\upx.exe -q {} -o {} {}".format(brute_option, packed_filepath, filepath))
+        time.sleep(10.0)
         proc1.kill()
         time.sleep(1.0)
         if os.path.exists(packed_filepath):
@@ -191,7 +198,7 @@ def process_file(input_file):
 
     return result
 
-def process_files(input_dir, packers, output_dir='./output', temp_directory = './temp'):
+def process_files(input_dir, packers, output_dir='./output', temp_directory = './temp', processors=None):
     all_files = get_files(input_dir)
     batch_run_times = []
     batch_size = 1000
@@ -213,8 +220,12 @@ def process_files(input_dir, packers, output_dir='./output', temp_directory = '.
             prepared_input = [{'filepath' : filepath, 'temp_dir' : temp_directory, 'output_dir' : os.path.join(output_dir, "{:05d}".format(i)), 'packer' : packer} for filepath in all_files_batch]
 
             # Kick off batch
-            pool = mp.Pool(mp.cpu_count())
-            # pool = mp.Pool(1)
+            if processors is None:
+                processors = mp.cpu_count()
+            if processors > mp.cpu_count():
+                processors = mp.cpu_count()
+            pool = mp.Pool(processors)
+
             result = pool.map(process_file, prepared_input)
             temp_df = pd.DataFrame(result)
             result_df = pd.concat([result_df, temp_df])
@@ -249,8 +260,10 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output_directory', help='Base directory where results will be stored.')
     parser.add_argument('-t', '--temp_directory', help='Where temporary work area is created while processing files.')
     parser.add_argument('-p', '--packers', help='Comma separated list of packers to apply, or "all" to run all supported packers')
-
+    parser.add_argument('-c', '--cpus', type=int, help='Number of processors to run in parallel.  Will use all available if not specified.')
+    
     args = parser.parse_args()
+
     if not args.directory:
         print("Must provide an input directory.\n")
         parser.print_help()
@@ -265,12 +278,15 @@ if __name__ == "__main__":
     temp_directory = './temp'
     packers = 'all'
     output_directory = './output'
+    processors = None
     if args.packers:
         packers = args.packers
     if args.output_directory:
         output_directory = args.output_directory
     if args.temp_directory:
         temp_directory = args.temp_directory
-
-    process_files(input_directory, packers, output_directory, temp_directory)
+    if args.cpus:
+        processors = args.cpus
+        
+    process_files(input_directory, packers, output_directory, temp_directory, processors)
     print("Done!")

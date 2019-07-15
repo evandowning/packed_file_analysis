@@ -7,3 +7,4 @@ signify
 elasticsearch>=6.0.0,<7.0.0
 tensorflow==2.0.0-beta1
 matplotlib
+scikit-learn
