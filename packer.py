@@ -28,7 +28,7 @@ import random
 # python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "upx" -o "E:\data\packed_malware_gatech\packed_upx" -t "E:\data\packed_malware_gatech\temp\temp_upx" -c 1
 
 # Run aspack
-# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "aspack" -o "E:\data\packed_malware_gatech\packed_aspack" -t "E:\data\packed_malware_gatech\temp\temp_aspack" -c 3
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "aspack" -o "E:\data\packed_malware_gatech\packed_aspack" -t "E:\data\packed_malware_gatech\temp\temp_aspack"
 
 
 def packer_andpakk2(filepath):
@@ -242,7 +242,7 @@ def process_files(input_dir, packers, output_dir='./output', temp_directory = '.
             end_idx += batch_size
 
     print("DONE")
-    result_df.to_csv('./{}_{}_all_files_processed.csv'.format(datetime.now().isoformat(), packer), index=False, header=True, encoding='utf-8')
+    result_df.to_csv('./{}_{}_all_files_processed.csv'.format(datetime.now().isoformat().replace(':',''), packer), index=False, header=True, encoding='utf-8')
     return result_df
 
 def get_files(directory_path):
