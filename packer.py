@@ -19,7 +19,7 @@ import random
 # python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "none" -o "E:\data\packed_malware_gatech\not_packed" -t "E:\data\packed_malware_gatech\temp\temp_not_packed"
 
 # Run APK2
-# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "andpakk2" -o "E:\data\packed_malware_gatech\packed_andpakk2" -t "E:\data\packed_malware_gatech\temp\temp_andpakk2" -c 2
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "andpakk2" -o "E:\data\packed_malware_gatech\packed_andpakk2" -t "E:\data\packed_malware_gatech\temp\temp_andpakk2"
 
 # Run MEW
 # python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "mew" -o "E:\data\packed_malware_gatech\packed_mew" -t "E:\data\packed_malware_gatech\temp\temp_mew" -c 2
@@ -28,7 +28,10 @@ import random
 # python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "upx" -o "E:\data\packed_malware_gatech\packed_upx" -t "E:\data\packed_malware_gatech\temp\temp_upx" -c 1
 
 # Run aspack
-# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "aspack" -o "E:\data\packed_malware_gatech\packed_aspack" -t "E:\data\packed_malware_gatech\temp\temp_aspack"
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "aspack" -o "E:\data\packed_malware_gatech\packed_aspack" -t "E:\data\packed_malware_gatech\temp\temp_aspack" -c 2
+
+# Run mpress
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "mpress" -o "E:\data\packed_malware_gatech\packed_mpress" -t "E:\data\packed_malware_gatech\temp\temp_mpress"
 
 
 def packer_andpakk2(filepath):
@@ -79,24 +82,30 @@ def packer_mew(filepath):
     Mew packs the file in place and it might fail, so we need to compare the hash before and after.
     '''
     try:
+        # Save current working directory
+        cwd = os.getcwd()
+        # Change dir to temp
+        os.chdir(os.path.dirname(filepath))
+        shutil.copyfile("C:\\packers\\MEW\\mew11.exe", os.path.join(os.path.dirname(filepath), "mew11.exe"))
+
         orig_hashes = utils.get_hashes(filepath=filepath)
         orig_hash = orig_hashes.get('md5', '')
         print("\nORIGINAL HASH: {}".format(orig_hash))
-        print(orig_hashes)
-        proc1 = subprocess.Popen(r"C:\packers\MEW\mew11.exe {}".format(filepath))
+        proc1 = subprocess.Popen(r"mew11.exe {}".format(os.path.basename(filepath)))
         time.sleep(15.0)
         proc1.kill()
         time.sleep(1.0)
         new_hashes = utils.get_hashes(filepath=filepath)
+        os.chdir(cwd)
 
         new_hash = new_hashes.get('md5', '')
         print("NEW HASH: {}".format(new_hash))
-        print(new_hashes)
         # They are both valid MD5 values, but not equal
         if len(orig_hash) == 32 and len(new_hash) == 32 and orig_hash != new_hash:
             return filepath
         return ''
     except Exception as e:
+        os.chdir(cwd)
         return ''
 
 def packer_mpress(filepath):
@@ -242,7 +251,7 @@ def process_files(input_dir, packers, output_dir='./output', temp_directory = '.
             end_idx += batch_size
 
     print("DONE")
-    result_df.to_csv('./{}_{}_all_files_processed.csv'.format(datetime.now().isoformat().replace(':',''), packer), index=False, header=True, encoding='utf-8')
+    result_df.to_csv('./{}_{}_all_files_processed.csv'.format(datetime.now().isoformat(), packer), index=False, header=True, encoding='utf-8')
     return result_df
 
 def get_files(directory_path):

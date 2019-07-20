@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten, Conv2D, Conv1D, MaxPooling2D, MaxPooling1D
 import os
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -14,7 +17,9 @@ NAME = "PackerIdentifier-{}".format(datetime.now().isoformat().replace(':',''))
 CLASSES = ['not_packed', 'mpress', 'aspack', 'andpakk2', 'upx']
 CLASS_TO_IDX = {CLASSES[i]: i for i in range(len(CLASSES))}
 NUM_BYTES = 1024
-BATCH_SIZE = 32
+NUM_BYTES = 1024*1024
+SHAPE = (1024, 1024, 1)
+BATCH_SIZE = 8
 
 # XLA_FLAGS=--xla_hlo_profile python build_model.py -d "/home/test/vm_shared/packed_exes/test_data_packed" -t 64n
 
@@ -37,7 +42,7 @@ def extract_data(filepath, savefile=None, overwrite=True):
 
     labeled_files = []
     for filename in all_files:
-        if '.gz' in filename:
+        if os.path.isfile(filename) and '.' not in filename:
             for label in CLASSES:
                 # ensure one of the labels is present
                 if label in filename:
@@ -47,7 +52,7 @@ def extract_data(filepath, savefile=None, overwrite=True):
 
     df = pd.DataFrame(labeled_files)
     min_cnt_per_label = int(df.label.value_counts().min())
-    min_cnt_per_label = 50
+    min_cnt_per_label = 25
 
     df_files_to_use = pd.DataFrame()
     for label_idx in range(len(CLASSES)):
@@ -64,16 +69,19 @@ def extract_data(filepath, savefile=None, overwrite=True):
 
 def get_raw_bytes(filename, size=1024):
     try:
-        buffer = utils.decompress_file(filename, in_memory=True)
-        pe = pefile.PE(data=buffer)
-        ep = pe.OPTIONAL_HEADER.AddressOfEntryPoint
-        np_array = np.frombuffer(pe.get_data(ep, length=size), np.uint8)
+        # buffer = utils.decompress_file(filename, in_memory=True)
+        # pe = pefile.PE(filename)
+        # ep = pe.OPTIONAL_HEADER.AddressOfEntryPoint
+        with open(filename, 'rb') as f:
+            buffer = f.read(NUM_BYTES)
+        np_array = np.frombuffer(buffer, np.uint8)
         # Pad the array if needed
         if np_array.shape[0] != size:
             np_array_padded =  np.zeros(size, dtype=np.uint8)
             np_array_padded[:np_array.shape[0]] = np_array
-            return np_array_padded
-        return np_array
+            np_array = np_array_padded
+        np_array = np_array / 255.0
+        return np_array.reshape(1, 1024, 1024)
     except:
         return None
 
@@ -109,6 +117,35 @@ def build_model(num_features, num_labels):
     model.compile(optimizer='adam',
                 loss='sparse_categorical_crossentropy',
                 metrics=['accuracy'])
+    return model
+
+def build_cnn_model(num_features, num_labels):
+    filters = 16  # number output channels
+    kernel_size = (3, 3)  #
+    padding = 'same'  # means no padding, so it shrinks a little
+    num_labels = 5
+    stride = 2
+    # Dropout or not?
+    # 2 layers or 3?
+    # How large for last dense layer 32, 64, 128
+
+    model = Sequential([
+        Conv2D(64, kernel_size, strides=stride, padding=padding, activation='relu', input_shape=SHAPE),
+        MaxPooling2D(),
+        Conv2D(32, kernel_size, strides=stride, padding=padding, activation='relu'),
+        MaxPooling2D(),
+        Conv2D(16, kernel_size, strides=stride, padding=padding, activation='relu'),
+        MaxPooling2D(),
+        Flatten(),
+        Dropout(0.3),
+        Dense(64, activation='relu'),
+        Dropout(0.3),
+        Dense(num_labels, activation='softmax')
+    ])
+
+    model.compile(optimizer='adam',
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
     return model
 
 def build_models(config):
@@ -148,7 +185,7 @@ def fit_model(model, train_data, test_data):
     # Create checkpoint callback
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(checkpoint_path,
                                                      save_weights_only=True,
-                                                     save_best_only=True,
+                                                     save_best_only=False,
                                                      verbose=1,
                                                      save_freq='epoch')
 
@@ -169,13 +206,13 @@ def fit_model(model, train_data, test_data):
     # https://www.tensorflow.org/versions/r2.0/api_docs/python/tf/keras/Model#fit_generator
     history = model.fit_generator(generate_file_byte_input(train_data, BATCH_SIZE),
                                   epochs=EPOCHS,
-                                  steps_per_epoch=len(train_data),
-                                  validation_steps=len(test_data),
+                                  steps_per_epoch=(len(train_data) / BATCH_SIZE),
+                                  validation_steps=(len(test_data) / BATCH_SIZE),
                                   validation_data=generate_file_byte_input(test_data),
                                   verbose=0,
-                                  use_multiprocessing=True,
-                                  workers=10,
-                                  max_queue_size=64,
+                                  use_multiprocessing=False,
+                                  #workers=16,
+                                  max_queue_size=10,
                                   callbacks=[checkpoint_callback, tensorboard_callback])
 
     return history, model
@@ -209,6 +246,7 @@ def generate_file_byte_input(files_df, batch_size=32):
     :param batch_size: number of data points to return
     :return: yeilds a batch as a tuple(np_array_X, np_array_labels)
     '''
+    total_batches = 0
     while 1:
         # Shuffle data before looping
         files_df = files_df.sample(frac=1).reset_index(drop=True)
@@ -235,8 +273,10 @@ def generate_file_byte_input(files_df, batch_size=32):
                     batch_labels.append(sample_label)
 
                 if len(batch_data) == batch_size:
-                    np_batch_data = np.array(batch_data)
+                    np_batch_data = np.array(batch_data).reshape((batch_size, 1024, 1024, 1))
                     np_batch_labels = np.array(batch_labels)
+                    total_batches+=1
+                    print('{}'.format(total_batches), end=' ', flush=True)
                     yield (np_batch_data, np_batch_labels)
                     batch_data = []
                     batch_labels = []
@@ -263,7 +303,8 @@ if __name__ == "__main__":
     test = files_df[~train_idx]
     num_test_batches = int(len(test) / BATCH_SIZE)
 
-    model = build_model(NUM_BYTES, len(CLASSES))
+    # model = build_model(NUM_BYTES, len(CLASSES))
+    model = build_cnn_model(NUM_BYTES, len(CLASSES))
     model.summary()
 
     print("\nStarting training with {} training samples and {} test samples".format(train.shape[0], test.shape[0]))
