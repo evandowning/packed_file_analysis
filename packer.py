@@ -11,6 +11,10 @@ import shutil
 import subprocess
 from datetime import datetime
 import random
+import calendar
+
+# Kill error windows in a loop
+# while (1) {Get-Process | Where {$_.ProcessName -Like "WerFault*"} | stop-process; Start-Sleep -Seconds 5}
 
 # Activate Environment
 # C:\Users\analyst\Desktop\venv\pe_analysis\Scripts\activate
@@ -77,6 +81,24 @@ def packer_upx(filepath):
     except Exception as e:
         return ''
 
+def packer_petite(filepath):
+    packed_filepath = filepath + '.packed'
+    options = ''
+    for option in ['-a', '-m0', '-d0', '-s0', '-s1', '-s2', '-r*', '-ts0']:
+        if random.randint(0,1):
+            options = '{} {}'.format(options, option)
+    try:
+        proc1 = subprocess.Popen(r"C:\packers\petite\petite.exe {} -o{} {}".format(filepath, packed_filepath, options))
+        time.sleep(10.0)
+        proc1.kill()
+        time.sleep(1.0)
+        if os.path.exists(packed_filepath):
+            return packed_filepath
+        return ''
+    except Exception as e:
+        return ''
+
+
 def packer_mew(filepath):
     '''
     Mew packs the file in place and it might fail, so we need to compare the hash before and after.
@@ -97,6 +119,18 @@ def packer_mew(filepath):
         time.sleep(1.0)
         new_hashes = utils.get_hashes(filepath=filepath)
         os.chdir(cwd)
+
+        # MEW creates temp files in %TEMP% directory and if we don't clean them up we run out of disk space
+        try:
+            mew_temp_files = [str(filename) for filename in Path(os.getenv("TEMP")).glob('*mew*.tmp')]
+            now = calendar.timegm(time.gmtime())
+            for filename in mew_temp_files:
+                filetime = os.path.getctime(filename)
+                # delete temp files more than a minute old
+                if now - filetime > 60:
+                    os.remove(filename)
+        except:
+            pass
 
         new_hash = new_hashes.get('md5', '')
         print("NEW HASH: {}".format(new_hash))
@@ -135,7 +169,6 @@ def packer_mpress(filepath):
     except Exception as e:
         return ''
 
-
 def pack_file(temp_filepath, packer):
     if packer == 'none':
         return temp_filepath
@@ -147,8 +180,9 @@ def pack_file(temp_filepath, packer):
         return packer_mew(temp_filepath)
     if packer == 'upx':
         return packer_upx(temp_filepath)
+    if packer == 'petite':
+        return packer_petite(temp_filepath)
     return temp_filepath
-
 
 def process_file(input_file):
     orig_filepath = input_file.get('filepath', 'none')
@@ -192,17 +226,17 @@ def process_file(input_file):
             utils.compress_file(packed_filepath, new_packed_filepath)
         else:
             result['status'] = 'Failed to pack file: {}'.format(temp_filepath)
-            shutil.rmtree(input_file_temp_dir, ignore_errors=False, onerror=None)
+            shutil.rmtree(input_file_temp_dir, ignore_errors=True, onerror=None)
             return result
 
         # Destroy temporary space
-        shutil.rmtree(input_file_temp_dir, ignore_errors=False, onerror=None)
+        shutil.rmtree(input_file_temp_dir, ignore_errors=True, onerror=None)
         result['status'] = 'Success'
 
     except Exception as e:
         result['status'] = 'Unrecoverable error: {}'.format(e)
         if input_file_temp_dir != 'none':
-            shutil.rmtree(input_file_temp_dir, ignore_errors=False, onerror=None)
+            shutil.rmtree(input_file_temp_dir, ignore_errors=True, onerror=None)
         return result
 
     return result
