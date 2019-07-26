@@ -145,8 +145,8 @@ def pretty_plot_confusion_matrix(df_cm, annot=True, cmap="Oranges", fmt='.2f', f
                     cbar=cbar, cmap=cmap, linecolor='w', fmt=fmt)
 
     #set ticklabels rotation
-    ax.set_xticklabels(ax.get_xticklabels(), rotation = 45, fontsize = 10)
-    ax.set_yticklabels(ax.get_yticklabels(), rotation = 25, fontsize = 10)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation = 45, fontsize = fz)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation = 25, fontsize = fz)
 
     # Turn off all the ticks
     for t in ax.xaxis.get_major_ticks():
@@ -184,9 +184,9 @@ def pretty_plot_confusion_matrix(df_cm, annot=True, cmap="Oranges", fmt='.2f', f
         ax.text(item['x'], item['y'], item['text'], **item['kw'])
 
     #titles and legends
-    ax.set_title('Confusion matrix')
-    ax.set_xlabel(xlbl)
-    ax.set_ylabel(ylbl)
+    ax.set_title('Confusion Matrix', fontsize=(fz+2))
+    ax.set_xlabel(xlbl, fontsize=fz)
+    ax.set_ylabel(ylbl, fontsize=fz)
     plt.tight_layout()  #set layout slim
     if filepath is not None:
         plt.savefig(filepath)
@@ -211,8 +211,8 @@ def plot_confusion_matrix_from_data(y_test, predictions, columns=None, annot=Tru
 
     confm = confusion_matrix(y_test, predictions)
     cmap = 'Oranges'
-    fz = 11
-    figsize=[12,12]
+    fz = 16
+    figsize=[14,14]
     show_null_values = 2
     df_cm = DataFrame(confm, index=columns, columns=columns)
     pretty_plot_confusion_matrix(df_cm, fz=fz, cmap=cmap, figsize=figsize, show_null_values=show_null_values, pred_val_axis=pred_val_axis, filepath=filepath)

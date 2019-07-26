@@ -5,6 +5,7 @@ PyExifTool
 pandas
 signify
 elasticsearch>=6.0.0,<7.0.0
-tensorflow==2.0.0-beta1
-matplotlib
+matplotlib<3.0
 scikit-learn
+tensorflow==2.0.0-beta1
+seaborn

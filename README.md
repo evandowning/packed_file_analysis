@@ -5,10 +5,10 @@ The goal of this project is to assess the viability of accurately detecting spec
 There are three main parts to this project.
 1. Profiling PE files.
 1. Packing PE files.
-1. Classifier for packed files.
+1. Multi-class Classifier for packed files.
 
 ### 1. Profiling PE Files
-Implemented in profiler.py.  Takes in a directory containing files and returns basic file triage information similar to what VirusTotal provides.
+Implemented in profiler.py.  Takes in a directory containing files and returns basic file triage information similar to the metadata from VirusTotal.
 * File Type (output of file command)
 * PE metadata (imports, exports, sections, resources, code signing, strings summary)
 * Exif metadata
@@ -54,3 +54,12 @@ Implemented in packer.py
 ### 3. Classifying PE Files
 Implemented in build_model.py
 
+
+## Results
+This proof of concept was initially tested with a dataset of 18k labeled files and five classes ("not packed", "mpress", "UPX", "Aspack", and "andpakk2").
+
+![Alt text](plots/accuracy_plot.png "Accuracy Plot")
+
+![Alt text](plots/loss_plot.png "Loss Plot")
+
+![Alt text](plots/confusion_matrix.png "Confusion Matrix")

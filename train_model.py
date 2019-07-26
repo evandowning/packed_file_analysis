@@ -11,11 +11,12 @@ import os
 import time
 from datetime import datetime
 
-EPOCHS = 10
-NAME = "PackerIdentifier-medium-20_epochs_{}".format(datetime.now().isoformat().replace(':',''))
+EPOCHS = 20
+BATCH_SIZE = 32
+NAME = "PackerIdentifier-medium-{}_epochs_{}_batchsize_{}".format(EPOCHS, BATCH_SIZE, datetime.now().isoformat().replace(':',''))
 CLASSES = ['not_packed', 'mpress', 'aspack', 'andpakk2', 'upx']
 CLASS_TO_IDX = {CLASSES[i]: i for i in range(len(CLASSES))}
-BATCH_SIZE = 32
+
 
 def translate_class(label_or_idx):
     try:
@@ -115,7 +116,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     filepath = '/media/test/malware/packer_analysis/'
-    files_df = prepare_dataset(filepath, savefile=None, overwrite=True)
+    files_df = prepare_dataset(filepath, savefile=None, overwrite=False)
     train_idx = np.random.rand(len(files_df)) < 0.8
     df_train_files = files_df[train_idx].copy()
     df_test_files = files_df[~train_idx].copy()
@@ -135,8 +136,8 @@ if __name__ == "__main__":
     model.save(saved_model_file)
     # restored_model = models.load_model(saved_model_file)
 
-    # Use trained model to generate confusion matrix
-    df_eval_files = df_train_files[0 : BATCH_SIZE*int(len(df_train_files) / BATCH_SIZE)].copy()
+    # Use train model with test data to generate confusion matrix
+    df_eval_files = df_test_files[0 : BATCH_SIZE*int(len(df_test_files) / BATCH_SIZE)].copy()
     data_pipeline_eval = DataGenerator(df_eval_files, batch_size=BATCH_SIZE, dim=(512, 512), n_channels=1, n_classes=len(CLASSES), shuffle=False)
     results = model.predict_generator(data_pipeline_eval)
 

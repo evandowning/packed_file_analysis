@@ -37,6 +37,13 @@ import calendar
 # Run mpress
 # python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_2-15k" -p "mpress" -o "E:\data\packed_malware_gatech\packed_mpress" -t "E:\data\packed_malware_gatech\temp\temp_mpress"
 
+# Run petite
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "petite" -o "E:\data\packed_malware_gatech\packed_petite" -t "E:\data\packed_malware_gatech\temp\temp_petite"
+# run for 3_15
+
+# Run pecompact
+# python F:\pe_analysis\packer.py -d "E:\data\packed_malware_gatech\benign_cnet_1-15k" -p "pecompact" -o "E:\data\packed_malware_gatech\packed_pecompact" -t "E:\data\packed_malware_gatech\temp\temp_pecompact"
+# run for 4_15
 
 def packer_andpakk2(filepath):
     packed_filepath = filepath + '.packed'
@@ -120,18 +127,6 @@ def packer_mew(filepath):
         new_hashes = utils.get_hashes(filepath=filepath)
         os.chdir(cwd)
 
-        # MEW creates temp files in %TEMP% directory and if we don't clean them up we run out of disk space
-        try:
-            mew_temp_files = [str(filename) for filename in Path(os.getenv("TEMP")).glob('*mew*.tmp')]
-            now = calendar.timegm(time.gmtime())
-            for filename in mew_temp_files:
-                filetime = os.path.getctime(filename)
-                # delete temp files more than a minute old
-                if now - filetime > 60:
-                    os.remove(filename)
-        except:
-            pass
-
         new_hash = new_hashes.get('md5', '')
         print("NEW HASH: {}".format(new_hash))
         # They are both valid MD5 values, but not equal
@@ -169,6 +164,44 @@ def packer_mpress(filepath):
     except Exception as e:
         return ''
 
+def packer_pecompact(filepath):
+    '''
+    PECompact packs the file in place and it might fail, so we need to compare the hash before and after.
+    '''
+    try:
+        options = ''
+        for option in ['/StripDebug', 
+                       '/MultiCompress',
+                       '/TruncateLastSection',
+                       '/StripFixups',
+                       '/MergeSections',
+                       '/KeepOverlay',
+                       '/EnforceMemoryProtection',
+                       '/CompressResources']:
+            if random.randint(0,1):
+                options = '{} {}'.format(options, option)
+        orig_hashes = utils.get_hashes(filepath=filepath)
+        orig_hash = orig_hashes.get('md5', '')
+        print("\nORIGINAL HASH: {}".format(orig_hash))
+        print(orig_hashes)
+        proc1 = subprocess.Popen(r"C:\packers\PECompact\pec2.exe {} /Quiet {}".format(filepath, options))
+        time.sleep(15.0)
+        # Clean up
+        proc1.kill()
+        time.sleep(1.0)
+        new_hashes = utils.get_hashes(filepath=filepath)
+        new_hash = new_hashes.get('md5', '')
+        print("NEW HASH: {}".format(new_hash))
+        print(new_hashes)
+        # They are both valid MD5 values, but not equal
+        if len(orig_hash) == 32 and len(new_hash) == 32 and orig_hash != new_hash:
+            return filepath
+        return ''
+    except Exception as e:
+        return ''
+
+
+
 def pack_file(temp_filepath, packer):
     if packer == 'none':
         return temp_filepath
@@ -182,6 +215,8 @@ def pack_file(temp_filepath, packer):
         return packer_upx(temp_filepath)
     if packer == 'petite':
         return packer_petite(temp_filepath)
+    if packer == 'pecompact':
+        return packer_pecompact(temp_filepath)
     return temp_filepath
 
 def process_file(input_file):
@@ -232,6 +267,19 @@ def process_file(input_file):
         # Destroy temporary space
         shutil.rmtree(input_file_temp_dir, ignore_errors=True, onerror=None)
         result['status'] = 'Success'
+
+        # Some packers are creating .tmp files (e.g. MEW and PECompact)
+        # Let's remove them to not fill disk
+        try:
+            temp_files = [str(filename) for filename in Path(os.getenv("TEMP")).glob('*.tmp*')]
+            now = calendar.timegm(time.gmtime())
+            for filename in temp_files:
+                filetime = os.path.getctime(filename)
+                # delete temp files more than a minute old
+                if now - filetime > 60:
+                    os.remove(filename)
+        except:
+            pass
 
     except Exception as e:
         result['status'] = 'Unrecoverable error: {}'.format(e)
