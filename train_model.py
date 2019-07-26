@@ -4,17 +4,18 @@ import tensorflow as tf
 from tensorflow.keras import datasets, layers, models
 import lib.utils as utils
 from lib.file_data_pipeline import DataGenerator
+from lib.confusion_matrix import plot_confusion_matrix_from_data
 import pandas as pd
 import numpy as np
-
 import os
 import time
 from datetime import datetime
 
-EPOCHS = 20
+EPOCHS = 10
 NAME = "PackerIdentifier-medium-20_epochs_{}".format(datetime.now().isoformat().replace(':',''))
 CLASSES = ['not_packed', 'mpress', 'aspack', 'andpakk2', 'upx']
 CLASS_TO_IDX = {CLASSES[i]: i for i in range(len(CLASSES))}
+BATCH_SIZE = 32
 
 def translate_class(label_or_idx):
     try:
@@ -22,7 +23,7 @@ def translate_class(label_or_idx):
     except:
         return CLASS_TO_IDX.get(label_or_idx, None)
 
-def prepare_dataset(filepath, savefile=None, overwrite=True):
+def prepare_dataset(filepath, savefile=None, overwrite=True, max_num_per_label=None):
     # Save file provided and we are just loading it
     if savefile is not None:
         if not overwrite:
@@ -46,6 +47,8 @@ def prepare_dataset(filepath, savefile=None, overwrite=True):
 
     df = pd.DataFrame(labeled_files)
     min_cnt_per_label = int(df.label.value_counts().min())
+    if max_num_per_label is not None:
+        min_cnt_per_label = max_num_per_label
 
     df_files_to_use = pd.DataFrame()
     for label_idx in range(len(CLASSES)):
@@ -117,8 +120,8 @@ if __name__ == "__main__":
     df_train_files = files_df[train_idx].copy()
     df_test_files = files_df[~train_idx].copy()
 
-    data_pipeline_test = DataGenerator(df_test_files, batch_size=32, dim=(512, 512), n_channels=1, n_classes=len(CLASSES), shuffle=True)
-    data_pipeline_train = DataGenerator(df_train_files, batch_size=32, dim=(512, 512), n_channels=1, n_classes=len(CLASSES), shuffle=True)
+    data_pipeline_test = DataGenerator(df_test_files, batch_size=BATCH_SIZE, dim=(512, 512), n_channels=1, n_classes=len(CLASSES), shuffle=True)
+    data_pipeline_train = DataGenerator(df_train_files, batch_size=BATCH_SIZE, dim=(512, 512), n_channels=1, n_classes=len(CLASSES), shuffle=True)
 
     model = build_model(shape=(512, 512, 1), num_classes=len(CLASSES))
     model.summary()
@@ -126,3 +129,20 @@ if __name__ == "__main__":
     start_time = time.time()
     fit_model(model, data_pipeline_train, data_pipeline_test)
     print("\nTotal Train Time: %s minutes ---\n" % ((time.time() - start_time) / 60.0))
+
+    # Save current model
+    saved_model_file = './saved_models/{}_model.h5'.format(datetime.now().isoformat().replace(':',''))
+    model.save(saved_model_file)
+    # restored_model = models.load_model(saved_model_file)
+
+    # Use trained model to generate confusion matrix
+    df_eval_files = df_train_files[0 : BATCH_SIZE*int(len(df_train_files) / BATCH_SIZE)].copy()
+    data_pipeline_eval = DataGenerator(df_eval_files, batch_size=BATCH_SIZE, dim=(512, 512), n_channels=1, n_classes=len(CLASSES), shuffle=False)
+    results = model.predict_generator(data_pipeline_eval)
+
+    predictions = results.argmax(axis=1)
+    actual = list(df_eval_files.label.values)
+
+    if len(CLASSES) > 10:
+        fig_size = [14,14]
+    plot_confusion_matrix_from_data(actual, predictions, CLASSES, filepath='./{}_confusion.png'.format(datetime.now().isoformat().replace(':','')))
