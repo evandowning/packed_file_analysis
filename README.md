@@ -50,7 +50,7 @@ python profiler.py -d "E:\data\packed_malware_gatech\packed_mpress\00000" -t "E:
 ### 2. Packing PE Files
 This functionality was implemented in packer.py 
 
-Packing PE files was implemented in a local Virtual Machine without network access as a precaution.  The operation of this script works as follows:
+Packing PE files was implemented in a local Windows Virtual Machine with python 3.6 installed and no network access as a precaution.  The operation of this script works as follows:
 1. The script needs a directory of the files to pack (it will recursively gather a list all files in the directory and sub-directories).
 1. Next it runs multiple processes in parallel, each handling one file.
 1. Each original executable is copied to a temporary space, as many of the tools operate off of disk and some overwrite the original file provided.
@@ -89,6 +89,13 @@ Note: a powershell one-liner to kill any WerFault open windows helps keep the de
 ### 3. Classifying PE Files
 Implemented in train_model.py
 
+This script can be used for training a model as well as predictions, loading a saved model.
+
+Model training runs for a specified number of epochs.  As the model is being trained it writes checkpoint saves to a checkpoint directory with each epoch.  It also outputs logs for consumption by tensorboard.  Finally, it will output a confusion matrix plot.
+
+```
+
+```
 
 ## Results
 This proof of concept was initially tested with a dataset of 18k labeled files and five classes ("not packed", "mpress", "UPX", "Aspack", and "andpakk2").  Plan on testing this with a larger dataset with a few hundred thousand files and coverage for at least 10 packing tools in the near future.
