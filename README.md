@@ -87,14 +87,36 @@ Note: Several of the packers wrote temporary files in places like %TEMP% and the
 Note: a powershell one-liner to kill any WerFault open windows helps keep the desktop tidy.  Recommend running it in the background, as several of the packers fail frequently and display numerous failure popups.
 
 ### 3. Classifying PE Files
-Implemented in train_model.py
+Implemented in model.py.  This script can be used for training a model as well as predictions, loading a saved model.
 
-This script can be used for training a model as well as predictions, loading a saved model.
+Model Training Features:
+ * By default this script will attempt to train a new model if just provided with a directory of files to process.
+ * The labels for those files are discovered by the directory path to the file and the list of text strings in the global variable "CLASSES".
+ * As the model is being trained it writes checkpoint saves to a checkpoint directory with each epoch.
+ * The final model is saved to the saved_models directory and with a name containing any provided tag from the command line options.
+ * Finally, it will output a confusion matrix plot.  If a tag is provided, it will add it into the saved plot's file name.
 
-Model training runs for a specified number of epochs.  As the model is being trained it writes checkpoint saves to a checkpoint directory with each epoch.  It also outputs logs for consumption by tensorboard.  Finally, it will output a confusion matrix plot.
+To make predictions with the model, just provide it a directory and add the -p flag.  If there are multiple saved models in the saved_models directory, you can use the "tag" command line argument to specify which model to use.
 
 ```
+usage: model.py [-h] [-d DIRECTORY] [-t TAG] [-e EPOCHS] [-p]
 
+By default will build a new model or optionally can make predictions given a
+directory of files.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d DIRECTORY, --directory DIRECTORY
+                        Directory containing files to analyze (will recurse to
+                        sub directories).
+  -t TAG, --tag TAG     Distinct tag that can be used as a label on saved
+                        models and saved results.
+  -e EPOCHS, --epochs EPOCHS
+                        Number of epochs used in training (default = 20)
+  -p, --predict         When set, this flag indicates we want to make model
+                        predictions, rather than train a new model. Optionally
+                        used with a tag to specify portion of model name to
+                        load when predicting.
 ```
 
 ## Results

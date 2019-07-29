@@ -13,7 +13,7 @@ from datetime import datetime
 
 EPOCHS = 20
 BATCH_SIZE = 32
-NAME = "PackerIdentifier-medium-{}_epochs_{}_batchsize_{}".format(EPOCHS, BATCH_SIZE, datetime.now().isoformat().replace(':',''))
+NAME = "PackerIdentifier-{}_epochs_{}_batchsize_{}".format(EPOCHS, BATCH_SIZE, datetime.now().isoformat().replace(':',''))
 CLASSES = ['not_packed', 'mpress', 'aspack', 'andpakk2', 'upx']
 CLASS_TO_IDX = {CLASSES[i]: i for i in range(len(CLASSES))}
 
@@ -83,9 +83,9 @@ def build_model(shape=(28, 28, 1), num_classes=10):
 
     return model
 
-def fit_model(model, training_generator, validation_generator):
+def fit_model(model, training_generator, validation_generator, tag):
     # CHECKPOINTS while Training
-    checkpoint_path = "checkpoints/cp-{}-{}.ckpt".format(NAME, '{epoch:04d}')
+    checkpoint_path = "checkpoints/cp-{}-{}-{}.ckpt".format(tag, NAME, '{epoch:04d}')
     checkpoint_dir = os.path.dirname(checkpoint_path)
 
     # Create checkpoint callback
@@ -108,7 +108,7 @@ def fit_model(model, training_generator, validation_generator):
 
     return model
 
-def train(filepath):
+def train(filepath, tag):
     files_df = prepare_dataset(filepath, savefile=None, overwrite=False)
     train_idx = np.random.rand(len(files_df)) < 0.8
     df_train_files = files_df[train_idx].copy()
@@ -121,11 +121,11 @@ def train(filepath):
     model.summary()
 
     start_time = time.time()
-    fit_model(model, data_pipeline_train, data_pipeline_test)
+    fit_model(model, data_pipeline_train, data_pipeline_test, tag)
     print("\nTotal Train Time: %s minutes ---\n" % ((time.time() - start_time) / 60.0))
 
     # Save current model
-    saved_model_file = './saved_models/{}_model.h5'.format(datetime.now().isoformat().replace(':',''))
+    saved_model_file = './saved_models/{}_{}_model.h5'.format(datetime.now().isoformat().replace(':',''), tag)
     model.save(saved_model_file)
 
     # Use train model with test data to generate confusion matrix
@@ -138,7 +138,7 @@ def train(filepath):
 
     if len(CLASSES) > 10:
         fig_size = [14,14]
-    plot_confusion_matrix_from_data(actual, predictions, CLASSES, filepath='./{}_confusion.png'.format(datetime.now().isoformat().replace(':','')))
+    plot_confusion_matrix_from_data(actual, predictions, CLASSES, filepath='./{}_{}_confusion.png'.format(datetime.now().isoformat().replace(':',''), tag))
 
 
 def predict(filepath, tag):
@@ -178,11 +178,16 @@ def predict(filepath, tag):
     return df_predictions
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Parses metadata from files and stores them in log files.')
+    parser = argparse.ArgumentParser(description='By default will build a new model or optionally can make predictions given a directory of files.')
     parser.add_argument('-d', '--directory', help='Directory containing files to analyze (will recurse to sub directories).')
-    parser.add_argument('-t', '--tag', help='Directory containing files to analyze (will recurse to sub directories).')
-    parser.add_argument('-p', '--predict', action="store_true")
+    parser.add_argument('-t', '--tag', help='Distinct tag that can be used as a label on saved models and saved results.')
+    parser.add_argument('-e', '--epochs', help='Number of epochs used in training (default = 20)')
+    parser.add_argument('-p', '--predict', action="store_true", help='When set, this flag indicates we want to make model predictions, rather than train a new model.  Optionally used with a tag to specify portion of model name to load when predicting.')
     args = parser.parse_args()
+
+    if args.epochs:
+        EPOCHS = args.epochs
+        NAME = "PackerIdentifier-{}_epochs_{}_batchsize_{}".format(EPOCHS, BATCH_SIZE, datetime.now().isoformat().replace(':', ''))
 
     tag = None
     if args.tag:
